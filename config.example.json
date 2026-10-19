@@ -1,0 +1,78 @@
+{
+  "network": "mainnet",
+  "dryRun": true,
+  "dataDir": "./data",
+  "loopIntervalSec": 5,
+  "logLevel": "info",
+  "predict": {
+    "pollOrdersSec": 5,
+    "pollPositionsSec": 60,
+    "pollBookSec": 5,
+    "cancelOnExit": true,
+    "disconnectCancelSec": 60
+  },
+  "odds": {
+    "bookmakers": ["pinnacle", "betfair_ex_eu", "matchbook"],
+    "weights": { "pinnacle": 0.5, "betfair_ex_eu": 0.35, "matchbook": 0.15 },
+    "refreshSec": 120,
+    "maxSourceAgeSec": 900,
+    "maxFairAgeSec": 420,
+    "devig": "multiplicative",
+    "maxExchangeSpread": 0.05,
+    "maxSourceDispersion": 0.06,
+    "minSources": 2,
+    "minCreditsReserve": 20
+  },
+  "poly": {
+    "enabled": true,
+    "weight": 0.25,
+    "maxDeviation": 0.05,
+    "minDepthUsd": 50,
+    "depthWindow": 0.02,
+    "refreshSec": 30
+  },
+  "quote": {
+    "tickSize": 0.01,
+    "halfSpread": 0.015,
+    "minEdge": 0.005,
+    "skewMax": 0.02,
+    "orderCostUsd": 15,
+    "minOrderShares": 5,
+    "orderTtlSec": 900,
+    "requoteTicks": 1,
+    "requoteSizeRatio": 0.3,
+    "sellInventory": true,
+    "postOnly": true,
+    "minPrice": 0.05,
+    "maxPrice": 0.95
+  },
+  "risk": {
+    "maxCapitalUsd": 300,
+    "maxMarkets": 3,
+    "maxUnpairedCostPerMarketUsd": 30,
+    "dailyStopLossUsd": 10,
+    "maxOrderCostUsd": 20
+  },
+  "schedule": {
+    "quoteStartHoursBeforeKickoff": 24,
+    "quoteEndHoursBeforeKickoff": 2,
+    "exitMode": "merge_and_sell",
+    "exitMaxSlippage": 0.03
+  },
+  "merge": { "enabled": true, "minShares": 10, "cooldownSec": 120 },
+  "ws": { "enabled": true },
+  "aliases": {
+    "man utd": "manchester united"
+  },
+  "markets": [
+    {
+      "predictMarketId": 12345,
+      "outcome": "home",
+      "label": "Arsenal v Chelsea - Arsenal win",
+      "oddsSport": "soccer_epl",
+      "oddsEventId": "",
+      "teams": { "home": "Arsenal", "away": "Chelsea" },
+      "polySlug": ""
+    }
+  ]
+}
