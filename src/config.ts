@@ -161,15 +161,38 @@ export function validateConfig(cfg: Config): void {
   }
 }
 
-export function loadConfig(file: string): Config {
+/**
+ * Environment overrides (handy on hosts without a file system you can edit,
+ * e.g. Railway):
+ *   CONFIG_PATH   config file to load (default config.json)
+ *   CONFIG_JSON   full config as a JSON string; used instead of the file
+ *   MARKETS_JSON  JSON array that replaces config.markets
+ *   DRY_RUN       true|false
+ *   NETWORK       mainnet|testnet
+ *   DATA_DIR      where journal.jsonl / state.json live (mount a volume there)
+ *   LOG_LEVEL     debug|info|warn|error
+ */
+export function loadConfig(file?: string): Config {
   loadDotEnv();
+  const configPath = file ?? process.env.CONFIG_PATH ?? "config.json";
   let parsed: unknown = {};
-  if (fs.existsSync(file)) {
-    parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (process.env.CONFIG_JSON) {
+    parsed = JSON.parse(process.env.CONFIG_JSON);
+  } else if (fs.existsSync(configPath)) {
+    parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
   } else {
-    throw new Error(`config file not found: ${file} (copy config.example.json to config.json)`);
+    throw new Error(`config file not found: ${configPath} (copy config.example.json to config.json, or set CONFIG_PATH / CONFIG_JSON)`);
   }
   const cfg = deepMerge(structuredClone(DEFAULTS), parsed);
+  if (process.env.MARKETS_JSON) {
+    const markets = JSON.parse(process.env.MARKETS_JSON) as unknown;
+    if (!Array.isArray(markets)) throw new Error("MARKETS_JSON must be a JSON array");
+    cfg.markets = markets as MarketSpec[];
+  }
+  if (process.env.DRY_RUN !== undefined) cfg.dryRun = !/^(0|false|no|off)$/i.test(process.env.DRY_RUN.trim());
+  if (process.env.NETWORK) cfg.network = process.env.NETWORK.trim() as Config["network"];
+  if (process.env.DATA_DIR) cfg.dataDir = process.env.DATA_DIR;
+  if (process.env.LOG_LEVEL) cfg.logLevel = process.env.LOG_LEVEL.trim() as Config["logLevel"];
   if (!cfg.predict.apiBase) {
     cfg.predict.apiBase = cfg.network === "testnet" ? "https://api-testnet.predict.fun" : "https://api.predict.fun";
   }

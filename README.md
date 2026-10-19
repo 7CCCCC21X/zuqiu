@@ -77,6 +77,35 @@ node dist/index.js merge --market 123 [--pairs 20]
 
 `Ctrl+C` 会先撤掉所有挂单再退出（`predict.cancelOnExit`）。
 
+## 2.1 部署到 Railway（测试阶段推荐）
+
+仓库自带 `Dockerfile` 和 `railway.json`，Railway 会自动用 Dockerfile 构建并执行 `node dist/index.js run`。
+
+1. 把仓库推到 GitHub，在 Railway 里 **New Project → Deploy from GitHub repo** 选这个仓库（分支选你要跑的分支）。
+2. **Variables** 里填：
+
+   | 变量 | 值 |
+   |---|---|
+   | `PREDICT_API_KEY` / `PREDICT_PRIVATE_KEY` / `PREDICT_ACCOUNT` / `ODDS_API_KEY` | 同 `.env.example` |
+   | `CONFIG_PATH` | `config.example.json`（或你提交到仓库里的其它配置文件名） |
+   | `MARKETS_JSON` | 一个 JSON 数组，内容就是 `scan` 生成的 markets 条目，会替换配置里的 `markets` |
+   | `DRY_RUN` | `true` 先纸面模拟；要真下单改成 `false` |
+   | `NETWORK` | `mainnet` 或 `testnet` |
+   | `DATA_DIR` | `/data` |
+   | `PORT` | `8080`（打开后 Railway 会给一个域名，用浏览器看状态） |
+   | `STATUS_TOKEN` | 随便一串密码，访问状态页要带 `?token=` |
+
+   也可以不用 `CONFIG_PATH + MARKETS_JSON`，而是把整份配置放进 `CONFIG_JSON`。
+3. **Volume**：给这个 service 挂一个持久卷，挂载点 `/data`。不挂卷的话每次重新部署都会丢失 `journal.jsonl` 和 `state.json`，库存平均成本和报告都会归零。
+4. **Settings → Networking → Generate Domain**，端口填 `PORT` 的值。然后访问：
+   - `https://<域名>/?token=...` 状态（和日志里每分钟打印的 STATUS 一样）
+   - `https://<域名>/report?token=...` 盈亏 / 成交 / markout 报告
+   - `https://<域名>/state?token=...` JSON 明细
+5. 副本数必须是 1（`railway.json` 已写死 `numReplicas: 1`），两个实例会重复挂单。
+6. 重新部署或停止时 Railway 发 SIGTERM，程序会先撤掉所有挂单再退出；就算来不及，订单也会按 `orderTtlSec` 自行过期。
+
+`scan` / `fair` / `sports` / `poly-find` 这些一次性命令在本地跑就行（本地 `.env` 用同一套 key），`report` 直接看 `/report` 页面；如需在 Railway 里执行命令，用 `railway ssh -- node dist/index.js report`。
+
 ## 3. 配置说明（config.json）
 
 | 组 | 字段 | 默认 | 含义 |
@@ -113,6 +142,8 @@ node dist/index.js merge --market 123 [--pairs 20]
 | merge | `minShares` / `cooldownSec` | 10 / 120 | 配对 ≥10 份才发合并交易（省 gas） |
 | markets[] | `predictMarketId`, `outcome`, `oddsSport`, `oddsEventId`, `teams`, `kickoff`, `polySlug`, `polyMarketQuestion`, `disabled` | | 见 scan 输出 |
 | aliases | | | 队名别名（predict.fun 与赔率源写法不同时补充，内置了常见英超/西甲/意甲/德甲缩写） |
+
+环境变量可以覆盖配置：`CONFIG_PATH`（配置文件路径）、`CONFIG_JSON`（整份配置）、`MARKETS_JSON`（只替换 markets）、`DRY_RUN`、`NETWORK`、`DATA_DIR`、`LOG_LEVEL`；`PORT` 打开 HTTP 状态页，`STATUS_TOKEN` 给它加密码。
 
 ## 4. 运行逻辑细节
 

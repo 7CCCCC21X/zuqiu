@@ -926,14 +926,20 @@ export class Engine {
     this.deps.journal.saveState(st);
   }
 
-  printStatus(): void {
+  /** Realised / unrealised PnL and capital in use, for status output. */
+  pnlSnapshot(): { realizedToday: number; unrealized: number; capitalUsed: number; stopped: boolean } {
     let unrealized = 0;
+    for (const m of this.markets.values()) unrealized += markToMarket(m.inv, this.exitPrices(m));
+    return { realizedToday: this.risk.realizedToday, unrealized: fix(unrealized), capitalUsed: fix(this.capitalUsed()), stopped: this.risk.stopped };
+  }
+
+  /** Human-readable status block (also served by the HTTP status endpoint). */
+  statusText(): string {
     const lines: string[] = [];
     for (const m of this.markets.values()) {
       const top = m.book ? bookTop(m.book) : {};
       const u = unpaired(m.inv);
       const mtm = markToMarket(m.inv, this.exitPrices(m));
-      unrealized += mtm;
       const bids = [...m.orders.values()].filter((o) => o.status === "OPEN").map((o) => `${o.action === "BUY" ? "B" : "S"}${o.token[0]}${o.qty - o.filledQty}@${o.price}`).join(" ");
       const fair = m.fair?.ok ? `fair=${m.fair.p.toFixed(3)}${m.fair.polyMid !== undefined ? `/poly=${m.fair.polyMid.toFixed(3)}` : ""}` : `fair=n/a(${m.fair?.reason ?? "?"})`;
       const kick = m.kickoff ? `${((m.kickoff - Date.now()) / 3600_000).toFixed(1)}h` : "?";
@@ -942,10 +948,13 @@ export class Engine {
       );
     }
     const credits = this.deps.odds?.credits.remaining;
-    log.info(
-      `STATUS capital=${fmtUsd(this.capitalUsed())}/${this.cfg.risk.maxCapitalUsd} realizedToday=${fmtUsd(this.risk.realizedToday)} unrealized=${fmtUsd(unrealized)}${this.risk.stopped ? " STOPPED" : ""} oddsCredits=${credits ?? "?"} ws=${this.deps.ws?.connected ? "up" : "down"}\n${lines.join("\n")}`,
-    );
-    this.deps.journal.append("pnl", { realizedToday: this.risk.realizedToday, unrealized: fix(unrealized), capitalUsed: fix(this.capitalUsed()), stopped: this.risk.stopped });
+    const p = this.pnlSnapshot();
+    return `STATUS ${new Date().toISOString()} dryRun=${this.cfg.dryRun} capital=${fmtUsd(p.capitalUsed)}/${this.cfg.risk.maxCapitalUsd} realizedToday=${fmtUsd(p.realizedToday)} unrealized=${fmtUsd(p.unrealized)}${p.stopped ? " STOPPED" : ""} oddsCredits=${credits ?? "?"} ws=${this.deps.ws?.connected ? "up" : "down"}\n${lines.join("\n")}`;
+  }
+
+  printStatus(): void {
+    log.info(this.statusText());
+    this.deps.journal.append("pnl", this.pnlSnapshot());
   }
 }
 

@@ -10,6 +10,7 @@ import { Polymarket } from "./poly/polymarket";
 import { Journal } from "./store/journal";
 import { Engine } from "./mm/engine";
 import { buildReport } from "./report";
+import { startStatusServer } from "./server";
 import { detectOutcome, rankEvents } from "./mm/match";
 import { bookTop } from "./mm/quoter";
 import { fmtUsd, weiToNumber } from "./util/num";
@@ -50,6 +51,7 @@ function flag(args: Args, k: string): string | undefined {
 const USAGE = `predict.fun football market maker
 
 usage: node dist/index.js <command> [--config config.json] [options]
+  (env: CONFIG_PATH, CONFIG_JSON, MARKETS_JSON, DRY_RUN, NETWORK, DATA_DIR, LOG_LEVEL, PORT, STATUS_TOKEN)
 
   run                      start the bot (dryRun is controlled by config.dryRun)
   scan                     list predict.fun markets and the odds events they match
@@ -80,6 +82,8 @@ async function cmdRun(cfg: Config, secrets: Secrets): Promise<void> {
   const ws = cfg.ws.enabled ? new PredictWs(cfg.predict.wsUrl, secrets.predictApiKey) : null;
   const journal = new Journal(cfg.dataDir);
   const engine = new Engine(cfg, secrets, { api, trader, odds, poly, ws, journal });
+  const port = Number.parseInt(process.env.PORT ?? "", 10);
+  if (Number.isFinite(port) && port > 0) startStatusServer(port, engine, journal, process.env.STATUS_TOKEN || undefined);
   const shutdown = (sig: string) => {
     engine
       .stop(sig)
@@ -319,7 +323,7 @@ async function main(): Promise<void> {
     console.log(USAGE);
     return;
   }
-  const cfg = loadConfig(flag(args, "config") ?? "config.json");
+  const cfg = loadConfig(flag(args, "config"));
   setLogLevel((flag(args, "log") as Config["logLevel"] | undefined) ?? cfg.logLevel);
   const secrets = loadSecrets();
   switch (args.cmd) {
